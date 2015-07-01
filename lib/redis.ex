@@ -9,12 +9,8 @@ defmodule Redis do
     :eredis.start_link(String.to_char_list(host), port, database, String.to_char_list(password), reconnect_sleep)
   end
 
-  def execute(pid, [h|_] = commands) when is_binary(h) do
-    query(pid, commands)
-  end
-  def execute(pid, commands) do
-    query_pipeline(pid, commands)
-  end
+  def execute(pid, [h|_] = commands) when is_binary(h), do: query(pid, commands)
+  def execute(pid, commands), do: query_pipeline(pid, commands)
 
 
   ### KEY OPERATIONS
@@ -36,9 +32,7 @@ defmodule Redis do
       iex> execute(pid, del(["key1", "key2", "key3"]))
       "2"
   """
-  def del(keys) when is_list(keys) do
-    ["DEL"] ++ keys
-  end
+  def del(keys) when is_list(keys), do: ["DEL"] ++ keys
   def del(key), do: del([key])
 
   @doc ~S"""
@@ -51,9 +45,7 @@ defmodule Redis do
       iex> execute(pid, dump("mykey"))
       <<0, 192, 10, 6, 0, 248, 114, 63, 197, 251, 251, 95, 40>>
   """
-  def dump(key) do
-    ["DUMP", key]
-  end
+  def dump(key), do: ["DUMP", key]
 
   @doc ~S"""
   Returns if key exists.
@@ -67,9 +59,298 @@ defmodule Redis do
       iex> execute(pid, exists("key2"))
       "0"
   """
-  def exists(key) do
-    ["EXISTS", key]
-  end
+  def exists(key), do: ["EXISTS", key]
+
+  @doc ~S"""
+  Set a timeout on key. After the timeout has expired, the key will automatically be deleted.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, expire("mykey", 10))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "10"
+      iex> execute(pid, set("mykey", "Hello World"))
+      "OK"
+      iex> execute(pid, ttl("mykey"))
+      "-1"
+  """
+  def expire(key, seconds), do: ["EXPIRE", key, seconds]
+
+  @doc ~S"""
+  Same as `expire`, but takes a Unix `timestamp` instead of seconds to live.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, exists("mykey"))
+      "1"
+      iex> execute(pid, expireat("mykey", 1293840000))
+      "1"
+      iex> execute(pid, exists("mykey"))
+      "0"
+  """
+  def expireat(key, timestamp), do: ["EXPIREAT", key, timestamp]
+
+  @doc ~S"""
+  Returns all keys matching `pattern`.
+
+  ## Examples
+
+      iex> execute(pid, mset([{"one", 1}, {"two", 2}]))
+      iex> execute(pid, keys("*e*"))
+      ["one"]
+      iex> execute(pid, keys("t??"))
+      ["two"]
+      iex> execute(pid, keys("*"))
+      ["two", "one"]
+  """
+  def keys(pattern), do: ["KEYS", pattern]
+
+  # @doc ~S"""
+  # Atomically transfer a key from a source Redis instance to a destination Redis instance.
+  #
+  # ## Examples
+  #
+  #     iex> execute(pid, set("mykey", "Hello"))
+  #     "OK"
+  #     iex> execute(pid, migrate("127.0.0.1", "6379", "mykey", "2", "0"))
+  #     "OK"
+  #     iex> execute(pid, get("mykey"))
+  #     :undefined
+  # """
+  # def migrate(host, port, key, dbid, timeout) do
+  #   ["MIGRATE", host, port, key, dbid, timeout]
+  # end
+
+  @doc ~S"""
+  Move key from the currently selected database to the specified destination database.
+
+  ## Examples
+
+      iex> execute(pid, [["SELECT", "2"], ["DEL", "mykey"], ["SELECT", "1"]])
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, move("mykey", 2))
+      "1"
+      iex> execute(pid, get("mykey"))
+      :undefined
+  """
+  def move(key, dbid), do: ["MOVE", key, dbid]
+
+  @doc ~S"""
+  Move key from the currently selected database to the specified destination database.
+
+  ## Examples
+
+      iex> execute(pid, lpush("mylist", "Hello World"))
+      "1"
+      iex> execute(pid, object("refcount", "mylist"))
+      "1"
+      iex> execute(pid, object("encoding", "mylist"))
+      "ziplist"
+      iex> execute(pid, object("idletime", "mylist"))
+      "0"
+      iex> execute(pid, set("foo", 1000))
+      "OK"
+      iex> execute(pid, object("encoding", "foo"))
+      "int"
+      iex> execute(pid, append("foo", "bar"))
+      "7"
+      iex> execute(pid, object("encoding", "foo"))
+      "raw"
+  """
+  def object(subcommand, key), do: ["OBJECT", subcommand, key]
+
+  @doc ~S"""
+  Remove the existing timeout on `key`.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, expire("mykey", 10))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "10"
+      iex> execute(pid, persist("mykey"))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "-1"
+  """
+  def persist(key), do: ["PERSIST", key]
+
+  @doc ~S"""
+  Remove `key` after `ms` timeout.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, pexpire("mykey", 1900))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "2"
+  """
+  def pexpire(key, ms), do: ["PEXPIRE", key, ms]
+
+  @doc ~S"""
+  Remove `key` at ms timestamp.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, pexpireat("mykey", 1293840000000))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "-2"
+  """
+  def pexpireat(key, ms_timestamp), do: ["PEXPIREAT", key, ms_timestamp]
+
+  @doc ~S"""
+  Returns the remaining time to live in ms.
+  """
+  def pttl(key), do: ["PTTL", key]
+
+  @doc ~S"""
+  Return a random key from the currently selected database.
+
+  ## Examples
+
+      iex> execute(pid, randomkey)
+      :undefined
+  """
+  def randomkey, do: ["RANDOMKEY"]
+
+  @doc ~S"""
+  Renames `key` to `newkey`.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, rename("mykey", "myotherkey"))
+      "OK"
+      iex> execute(pid, get("myotherkey"))
+      "Hello"
+  """
+  def rename(key, newkey), do: ["RENAME", key, newkey]
+
+  @doc ~S"""
+  Renames `key` to `newkey` if `newkey` does not yet exist.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, set("myotherkey", "World"))
+      "OK"
+      iex> execute(pid, renamenx("mykey", "myotherkey"))
+      "0"
+      iex> execute(pid, get("myotherkey"))
+      "World"
+  """
+  def renamenx(key, newkey), do: ["RENAMENX", key, newkey]
+
+  @doc ~S"""
+  Deserialize the provided `serialized_value` into `key`.
+
+  ## Examples
+
+      iex> value = <<10, 17, 17, 0, 0, 0, 14, 0, 0, 0, 3, 0, 0, 242, 2, 243, 2,
+      iex> 244, 255, 6, 0, 90, 49, 95, 28, 103, 4, 33, 24>>
+      iex> execute(pid, restore("mykey", 0, value))
+      "OK"
+      iex> execute(pid, type("mykey"))
+      "list"
+      iex> execute(pid, lrange("mykey", 0, -1))
+      ["1", "2", "3"]
+  """
+  def restore(key, ttl, serialized_value), do: ["RESTORE", key, ttl, serialized_value]
+
+  @doc ~S"""
+  Incrementally iterate over a collection of elements.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      iex> execute(pid, scan(0))
+      ["0", ["mykey"]]
+      iex> execute(pid, scan(0))
+      ["0", ["mykey"]]
+  """
+  def scan(cursor), do: ["SCAN", cursor]
+
+  @doc ~S"""
+  Returns or stores the elements contained in the list, set or sorted set at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["2", "1", "3"]))
+      iex> execute(pid, sort("mylist"))
+      ["1", "2", "3"]
+      iex> execute(pid, sort("mylist", ["DESC"]))
+      ["3", "2", "1"]
+      iex> execute(pid, sort("mylist", ["LIMIT", 0, 2]))
+      ["1", "2"]
+      iex> execute(pid, sort("mylist", ["LIMIT", 0, 2, "DESC"]))
+      ["3", "2"]
+      iex> execute(pid, sort("mylist", ["BY", "nosort"]))
+      ["2", "1", "3"]
+  """
+  def sort(key, args) when is_list(args), do: ["SORT", key] ++ args
+  def sort(key), do: sort(key, [])
+
+  @doc ~S"""
+  Returns the remaining time to live of a key that has a timeout.
+
+  ## Examples
+
+      iex> execute(pid, set("mykey", "Hello"))
+      "OK"
+      iex> execute(pid, expire("mykey", 10))
+      "1"
+      iex> execute(pid, ttl("mykey"))
+      "10"
+  """
+  def ttl(key), do: ["TTL", key]
+
+  @doc ~S"""
+  Returns the string representation of the type of the value stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, set("key1", "value"))
+      "OK"
+      iex> execute(pid, lpush("key2", "value"))
+      "1"
+      iex> execute(pid, sadd("key3", "value"))
+      "1"
+      iex> execute(pid, type("key1"))
+      "string"
+      iex> execute(pid, type("key2"))
+      "list"
+      iex> execute(pid, type("key3"))
+      "set"
+  """
+  def type(key), do: ["TYPE", key]
+
+  @doc ~S"""
+  This command blocks the current client until all the previous write commands
+  are successfully transferred and acknowledged by at least the specified number of slaves.
+
+  ## Examples
+
+      iex> execute(pid, set("foo", "bar"))
+      "OK"
+      iex> execute(pid, wait(1, 1))
+      "0"
+  """
+  def wait(numslaves, timeout), do: ["WAIT", numslaves, timeout]
 
 
   ### STRING OPERATIONS
@@ -333,7 +614,7 @@ defmodule Redis do
   end
 
   @doc ~S"""
-  Returns the values of all specified keys.
+  Sets the given keys to their respective values.
 
   ## Examples
 
@@ -493,8 +774,316 @@ defmodule Redis do
   end
 
 
+  ### LIST OPERATIONS
 
 
+  @doc ~S"""
+  Blocking list pop primitive.
+
+  ## Examples
+
+      iex> execute(pid, rpush("list1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, blpop("list1", "0"))
+      ["list1", "a"]
+      iex> execute(pid, blpop(["list2", "list1"], "0"))
+      ["list1", "b"]
+  """
+  def blpop(keys, timeout) when is_list(keys), do: ["BLPOP"] ++ keys ++ [timeout]
+  def blpop(key, timeout), do: blpop([key], timeout)
+
+  @doc ~S"""
+  Blocking list pop primitive.
+
+  ## Examples
+
+      iex> execute(pid, rpush("list1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, brpop("list1", "0"))
+      ["list1", "c"]
+      iex> execute(pid, brpop(["list2", "list1"], "0"))
+      ["list1", "b"]
+  """
+  def brpop(keys, timeout) when is_list(keys), do: ["BRPOP"] ++ keys ++ [timeout]
+  def brpop(key, timeout), do: brpop([key], timeout)
+
+  @doc ~S"""
+  Returns and removes the last element (tail) of the list stored at `source`,
+  and pushes the element at the first element (head) of the list stored at
+  `destination`. Will wait for `timeout` seconds for elements to be added to the
+  `source` list if it is empty.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, brpoplpush("mylist", "myotherlist", 1))
+      "three"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["one", "two"]
+      iex> execute(pid, lrange("myotherlist", 0, -1))
+      ["three"]
+  """
+  def brpoplpush(source, dest, timeout), do: ["BRPOPLPUSH", source, dest, timeout]
+
+  @doc ~S"""
+  Returns the element at index `index` in the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["Hello", "World"]))
+      "2"
+      iex> execute(pid, lindex("mylist", 0))
+      "Hello"
+      iex> execute(pid, lindex("mylist", -1))
+      "World"
+      iex> execute(pid, lindex("mylist", 3))
+      :undefined
+  """
+  def lindex(key, index), do: ["LINDEX", key, index]
+
+  @doc ~S"""
+  Inserts `value` in the list stored at `key` either before or after the
+  reference value `pivot`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["Hello", "World"]))
+      "2"
+      iex> execute(pid, linsert("mylist", "BEFORE", "World", "There"))
+      "3"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "There", "World"]
+  """
+  def linsert(key, pos, pivot, value), do: ["LINSERT", key, pos, pivot, value]
+
+  @doc ~S"""
+  Returns the length of the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["Hello", "World"]))
+      "2"
+      iex> execute(pid, llen("mylist"))
+      "2"
+  """
+  def llen(key), do: ["LLEN", key]
+
+  @doc ~S"""
+  Returns the length of the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, lpop("mylist"))
+      "one"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["two", "three"]
+  """
+  def lpop(key), do: ["LPOP", key]
+
+  @doc ~S"""
+  Inserts all the specified `values` at the head of the list stored at `key`.
+  Creates `key` if it does not already exist.
+
+  ## Examples
+
+      iex> execute(pid, lpush("mylist", "World"))
+      "1"
+      iex> execute(pid, lpush("mylist", "Hello"))
+      "2"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "World"]
+  """
+  def lpush(key, values) when is_list(values), do: ["LPUSH", key] ++ values
+  def lpush(key, value), do: lpush(key, [value])
+
+  @doc ~S"""
+  Inserts `value` at the head of the list stored at `key`, only if `key` already
+  exists and holds a list.
+
+  ## Examples
+
+      iex> execute(pid, lpush("mylist", "World"))
+      "1"
+      iex> execute(pid, lpushx("mylist", "Hello"))
+      "2"
+      iex> execute(pid, lpushx("myotherlist", "Hello"))
+      "0"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "World"]
+      iex> execute(pid, lrange("myotherlist", 0, -1))
+      []
+  """
+  def lpushx(key, value), do: ["LPUSHX", key, value]
+
+  @doc ~S"""
+  Returns the specified elements of the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, lrange("mylist", 0, 0))
+      ["one"]
+      iex> execute(pid, lrange("mylist", -3, 2))
+      ["one", "two", "three"]
+      iex> execute(pid, lrange("mylist", -100, 100))
+      ["one", "two", "three"]
+      iex> execute(pid, lrange("mylist", 5, 10))
+      []
+  """
+  def lrange(key, from, to), do: ["LRANGE", key, from, to]
+
+  @doc ~S"""
+  Removes the first `count` occurrences of elements equal to `value` from the
+  list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["hello", "hello", "foo", "hello"]))
+      "4"
+      iex> execute(pid, lrem("mylist", -2, "hello"))
+      "2"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["hello", "foo"]
+  """
+  def lrem(key, count, value), do: ["LREM", key, count, value]
+
+  @doc ~S"""
+  Sets the list element at `index` to `value`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, lset("mylist", 0, "four"))
+      "OK"
+      iex> execute(pid, lset("mylist", -2, "five"))
+      "OK"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["four", "five", "three"]
+  """
+  def lset(key, index, value), do: ["LSET", key, index, value]
+
+  @doc ~S"""
+  Trim an existing list so that it will only contain elements at the specified
+  range.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, ltrim("mylist", 1, -1))
+      "OK"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["two", "three"]
+  """
+  def ltrim(key, start, stop), do: ["LTRIM", key, start, stop]
+
+  @doc ~S"""
+  Removes and returns the last element of the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, rpop("mylist"))
+      "three"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["one", "two"]
+  """
+  def rpop(key), do: ["RPOP", key]
+
+  @doc ~S"""
+  Atomically returns and removes the last element (tail) of the list stored at
+  `source`, and pushes the element at the first element (head) of the list stored
+  at `destination`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, rpoplpush("mylist", "myotherlist"))
+      "three"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["one", "two"]
+      iex> execute(pid, lrange("myotherlist", 0, -1))
+      ["three"]
+  """
+  def rpoplpush(source, dest), do: ["RPOPLPUSH", source, dest]
+
+  @doc ~S"""
+  Insert all the specified `values` at the tail of the list stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", "Hello"))
+      "1"
+      iex> execute(pid, rpush("mylist", "World"))
+      "2"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "World"]
+      iex> execute(pid, rpush("mylist", ["Wide", "Web"]))
+      "4"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "World", "Wide", "Web"]
+  """
+  def rpush(key, values) when is_list(values), do: ["RPUSH", key] ++ values
+  def rpush(key, value), do: rpush(key, [value])
+
+  @doc ~S"""
+  Insert all the specified `value` at the tail of the list stored at `key`, only
+  if the `key` exists.
+
+  ## Examples
+
+      iex> execute(pid, rpush("mylist", "Hello"))
+      "1"
+      iex> execute(pid, rpushx("mylist", "World"))
+      "2"
+      iex> execute(pid, rpushx("myotherlist", "World"))
+      "0"
+      iex> execute(pid, lrange("mylist", 0, -1))
+      ["Hello", "World"]
+      iex> execute(pid, lrange("myotherlist", 0, -1))
+      []
+  """
+  def rpushx(key, value), do: ["RPUSHX", key, value]
+
+
+  ### SET OPERATIONS
+
+
+  @doc ~S"""
+  Add the specified `members` to the set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", "Hello"))
+      "1"
+      iex> execute(pid, sadd("myset", "World"))
+      "1"
+      iex> execute(pid, sadd("myset", ["Hello", "World"]))
+      "0"
+      iex> execute(pid, smembers("myset"))
+      ["World", "Hello"]
+  """
+  def sadd(key, values) when is_list(values), do: ["SADD", key] ++ values
+  def sadd(key, value), do: sadd(key, [value])
+
+  @doc ~S"""
+  Returns all the members of the set value stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["Hello", "World"]))
+      "2"
+      iex> execute(pid, smembers("myset"))
+      ["World", "Hello"]
+  """
+  def smembers(key), do: ["SMEMBERS", key]
 
 
 
