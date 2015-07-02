@@ -655,17 +655,15 @@ defmodule Redis do
       iex> execute(pid, mget(["key1", "key2", "key3"]))
       ["Hello", "there", :undefined]
   """
-  def msetnx([h|_] = key_values) when is_list(key_values) and is_binary(h)  do
+  def msetnx([h|_] = key_values) when is_binary(h)  do
     ["MSETNX"] ++ key_values
   end
-  def msetnx([h|_] = key_values) when is_list(key_values) and is_tuple(h) do
+  def msetnx([h|_] = key_values) when is_tuple(h) do
     key_values
     |> Enum.flat_map(&Tuple.to_list(&1))
     |> msetnx
   end
-  def msetnx(key, value) do
-    [key, value] |> msetnx
-  end
+  def msetnx(key, value), do: [key, value] |> msetnx
 
   @doc ~S"""
   Like `setex` but with expire time is milliseconds instead of seconds.
@@ -677,9 +675,7 @@ defmodule Redis do
       iex> execute(pid, get("mykey"))
       "Hello"
   """
-  def psetex(key, ms, value) do
-    ["PSETEX", key, ms, value]
-  end
+  def psetex(key, ms, value), do: ["PSETEX", key, ms, value]
 
   @doc ~S"""
   Set key to hold the string `value`.
@@ -691,9 +687,7 @@ defmodule Redis do
       iex> execute(pid, get("mykey"))
       "Hello"
   """
-  def set(key, value) do
-    ["SET", key, to_string(value)]
-  end
+  def set(key, value), do: ["SET", key, to_string(value)]
 
   @doc ~S"""
   Sets or clears the bit at offset in the string value stored at key.
@@ -707,9 +701,7 @@ defmodule Redis do
       iex> execute(pid, get("mykey"))
       << 0 >>
   """
-  def setbit(key, offset, value) do
-    ["SETBIT", key, offset, value]
-  end
+  def setbit(key, offset, value), do: ["SETBIT", key, offset, value]
 
   @doc ~S"""
   Set `key` to hold the string `value` and set `key` to timeout after a given number of seconds.
@@ -721,9 +713,7 @@ defmodule Redis do
       iex> execute(pid, get("mykey"))
       "Hello"
   """
-  def setex(key, s, value) do
-    ["SETEX", key, s, value]
-  end
+  def setex(key, s, value), do: ["SETEX", key, s, value]
 
   @doc ~S"""
   Set `key` to hold string `value` if `key` does not exist.
@@ -737,9 +727,7 @@ defmodule Redis do
       iex> execute(pid, get("mykey"))
       "Hello"
   """
-  def setnx(key, value) do
-    ["SETNX", key, value]
-  end
+  def setnx(key, value), do: ["SETNX", key, value]
 
   @doc ~S"""
   Overwrites part of the string stored at key, starting at the specified offset, for the entire length of value.
@@ -753,9 +741,7 @@ defmodule Redis do
       iex> execute(pid, get("key1"))
       "Hello Redis"
   """
-  def setrange(key, offset, value) do
-    ["SETRANGE", key, offset, value]
-  end
+  def setrange(key, offset, value), do: ["SETRANGE", key, offset, value]
 
   @doc ~S"""
   Returns the length of the string value stored at key.
@@ -769,9 +755,7 @@ defmodule Redis do
       iex> execute(pid, strlen("nonexisting"))
       "0"
   """
-  def strlen(key) do
-    ["STRLEN", key]
-  end
+  def strlen(key), do: ["STRLEN", key]
 
 
   ### LIST OPERATIONS
@@ -1086,6 +1070,10 @@ defmodule Redis do
   def smembers(key), do: ["SMEMBERS", key]
 
 
+  ### SORTED SET OPERATIONS
+
+
+  ### HASH OPERATIONS
 
 
 
