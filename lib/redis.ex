@@ -337,19 +337,6 @@ defmodule Redis do
   """
   def type(key), do: ["TYPE", key]
 
-  @doc ~S"""
-  This command blocks the current client until all the previous write commands
-  are successfully transferred and acknowledged by at least the specified number of slaves.
-
-  ## Examples
-
-      iex> execute(pid, set("foo", "bar"))
-      "OK"
-      iex> execute(pid, wait(1, 1))
-      "0"
-  """
-  def wait(numslaves, timeout), do: ["WAIT", numslaves, timeout]
-
 
   ### STRING OPERATIONS
 
@@ -1242,8 +1229,8 @@ defmodule Redis do
 
       iex> execute(pid, sadd("myset", ["1", "2", "3", "foo", "foobar", "feelsgood"]))
       "6"
-      iex> execute(pid, sscan("myset", 0, ["MATCH", "f*"])) |> Enum.sort
-      [["feelsgood", "foo", "foobar"], "0"]
+      iex> execute(pid, sscan("myset", 0, ["MATCH", "f*"])) |> List.last |> Enum.sort
+      ["feelsgood", "foo", "foobar"]
   """
   def sscan(key, cursor, options \\ []), do: ["SSCAN", key, cursor] ++ options
 
