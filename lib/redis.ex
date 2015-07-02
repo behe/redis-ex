@@ -100,13 +100,13 @@ defmodule Redis do
 
   ## Examples
 
-      iex> execute(pid, mset([{"one", 1}, {"two", 2}]))
-      iex> execute(pid, keys("*e*"))
-      ["one"]
+      iex> execute(pid, mset([{"one", 1}, {"two", 2}, {"three", 3}, {"four", 4}]))
+      iex> execute(pid, keys("*o*")) |> Enum.sort
+      ["four", "one", "two"]
       iex> execute(pid, keys("t??"))
       ["two"]
-      iex> execute(pid, keys("*"))
-      ["two", "one"]
+      iex> execute(pid, keys("*")) |> Enum.sort
+      ["four", "one", "three", "two"]
   """
   def keys(pattern), do: ["KEYS", pattern]
 
@@ -280,10 +280,8 @@ defmodule Redis do
       iex> execute(pid, set("mykey", "Hello"))
       iex> execute(pid, scan(0))
       ["0", ["mykey"]]
-      iex> execute(pid, scan(0))
-      ["0", ["mykey"]]
   """
-  def scan(cursor), do: ["SCAN", cursor]
+  def scan(cursor, options \\ []), do: ["SCAN", cursor] ++ options
 
   @doc ~S"""
   Returns or stores the elements contained in the list, set or sorted set at `key`.
@@ -1051,11 +1049,113 @@ defmodule Redis do
       "1"
       iex> execute(pid, sadd("myset", ["Hello", "World"]))
       "0"
-      iex> execute(pid, smembers("myset"))
-      ["World", "Hello"]
+      iex> execute(pid, smembers("myset")) |> Enum.sort
+      ["Hello", "World"]
   """
   def sadd(key, values) when is_list(values), do: ["SADD", key] ++ values
   def sadd(key, value), do: sadd(key, [value])
+
+  @doc ~S"""
+  Returns the number of elements of the set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["Hello", "World"]))
+      "2"
+      iex> execute(pid, scard("myset"))
+      "2"
+  """
+  def scard(key), do: ["SCARD", key]
+
+  @doc ~S"""
+  Returns the members of the set resulting from the difference between the first
+  set and all the successive sets.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sdiff("key1")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sdiff("key1", ["key2"])) |> Enum.sort
+      ["a", "b"]
+  """
+  def sdiff(key, keys \\ []), do: ["SDIFF", key] ++ keys
+
+  @doc ~S"""
+  Writes the members of the set resulting from the difference between the first
+  set and all the successive sets to `dest`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sdiffstore("key", "key1"))
+      "3"
+      iex> execute(pid, smembers("key")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sdiffstore("key", "key1", ["key2"]))
+      "2"
+      iex> execute(pid, smembers("key")) |> Enum.sort
+      ["a", "b"]
+  """
+  def sdiffstore(dest, key, keys \\ []), do: ["SDIFFSTORE", dest, key] ++ keys
+
+  @doc ~S"""
+  Returns the members of the set resulting from the intersection of all the
+  given sets.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sinter("key1")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sinter("key1", ["key2"]))
+      ["c"]
+  """
+  def sinter(key, keys \\ []), do: ["SINTER", key] ++ keys
+
+  @doc ~S"""
+  Writes the members of the set resulting from the intersection of all the
+  given sets to `dest`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sinterstore("key", "key1"))
+      "3"
+      iex> execute(pid, smembers("key")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sinterstore("key", "key1", ["key2"]))
+      "1"
+      iex> execute(pid, smembers("key"))
+      ["c"]
+  """
+  def sinterstore(dest, key, keys \\ []), do: ["SINTERSTORE", dest, key] ++ keys
+
+  @doc ~S"""
+  Returns if `member` is a member of the set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", "one"))
+      "1"
+      iex> execute(pid, sismember("myset", "one"))
+      "1"
+      iex> execute(pid, sismember("myset", "two"))
+      "0"
+  """
+  def sismember(key, member), do: ["SISMEMBER", key, member]
 
   @doc ~S"""
   Returns all the members of the set value stored at `key`.
@@ -1064,10 +1164,125 @@ defmodule Redis do
 
       iex> execute(pid, sadd("myset", ["Hello", "World"]))
       "2"
-      iex> execute(pid, smembers("myset"))
-      ["World", "Hello"]
+      iex> execute(pid, smembers("myset")) |> Enum.sort
+      ["Hello", "World"]
   """
   def smembers(key), do: ["SMEMBERS", key]
+
+  @doc ~S"""
+  Move `member` from the set at `source` to the set at `dest`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["one", "two"]))
+      "2"
+      iex> execute(pid, sadd("myotherset", "three"))
+      "1"
+      iex> execute(pid, smove("myset", "myotherset", "two"))
+      "1"
+      iex> execute(pid, smembers("myset"))
+      ["one"]
+      iex> execute(pid, smembers("myotherset")) |> Enum.sort
+      ["three", "two"]
+  """
+  def smove(source, dest, member), do: ["SMOVE", source, dest, member]
+
+  @doc ~S"""
+  Removes and returns one or more random elements from the set value store at
+  `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, spop("myset"))
+      iex> execute(pid, scard("myset"))
+      "2"
+  """
+  def spop(key), do: ["SPOP", key]
+
+  @doc ~S"""
+  Returns one or more random elements from the set value store at
+  `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, srandmember("myset")) |> Enum.count
+      1
+      iex> execute(pid, srandmember("myset", 5)) |> Enum.count
+      3
+      iex> execute(pid, srandmember("myset", -5)) |> Enum.count
+      5
+  """
+  def srandmember(key, count \\ 1), do: ["SRANDMEMBER", key, count]
+
+  @doc ~S"""
+  Remove the specified `members` from the set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["one", "two", "three"]))
+      "3"
+      iex> execute(pid, srem("myset", "one"))
+      "1"
+      iex> execute(pid, srem("myset", ["three", "four"]))
+      "1"
+      iex> execute(pid, smembers("myset"))
+      ["two"]
+  """
+  def srem(key, members) when is_list(members), do: ["SREM", key] ++ members
+  def srem(key, member), do: srem(key, [member])
+
+  @doc ~S"""
+  Incrementally iterate over a collection of elements in a set.
+
+  ## Examples
+
+      iex> execute(pid, sadd("myset", ["1", "2", "3", "foo", "foobar", "feelsgood"]))
+      "6"
+      iex> execute(pid, sscan("myset", 0, ["MATCH", "f*"])) |> Enum.sort
+      [["feelsgood", "foo", "foobar"], "0"]
+  """
+  def sscan(key, cursor, options \\ []), do: ["SSCAN", key, cursor] ++ options
+
+  @doc ~S"""
+  Returns the members of the set resulting from the union of all the given sets.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sunion("key1")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sunion("key1", ["key2"])) |> Enum.sort
+      ["a", "b", "c", "d", "e"]
+  """
+  def sunion(key, keys \\ []), do: ["SUNION", key] ++ keys
+
+  @doc ~S"""
+  Write the members of the set resulting from the union of all the given sets to
+  `dest`.
+
+  ## Examples
+
+      iex> execute(pid, sadd("key1", ["a", "b", "c"]))
+      "3"
+      iex> execute(pid, sadd("key2", ["c", "d", "e"]))
+      "3"
+      iex> execute(pid, sunionstore("key", "key1"))
+      "3"
+      iex> execute(pid, smembers("key")) |> Enum.sort
+      ["a", "b", "c"]
+      iex> execute(pid, sunionstore("key", "key1", ["key2"]))
+      "5"
+      iex> execute(pid, smembers("key")) |> Enum.sort
+      ["a", "b", "c", "d", "e"]
+  """
+  def sunionstore(dest, key, keys \\ []), do: ["SUNIONSTORE", dest, key] ++ keys
 
 
   ### SORTED SET OPERATIONS
