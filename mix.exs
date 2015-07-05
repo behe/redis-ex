@@ -29,7 +29,7 @@ defmodule Redis.Mixfile do
   defp deps do
     [
       {:eredis,  ">= 1.0.8"},
-      {:mix_test_watch, "~> 0.1.1"}
+      {:mix_test_watch, "~> 0.1.1", only: :dev}
     ]
   end
 end
