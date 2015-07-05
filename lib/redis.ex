@@ -1275,6 +1275,341 @@ defmodule Redis do
   ### SORTED SET OPERATIONS
 
 
+  @doc ~S"""
+  Adds all the specified members with the specified scores to the sorted set
+  stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", 1, "one"))
+      "1"
+      iex> execute(pid, zadd("myset", [1, "uno"]))
+      "1"
+      iex> execute(pid, zadd("myset", [{2, "two"}, {3, "three"}]))
+      "2"
+      iex> execute(pid, zrange("myset", 0, -1, ["WITHSCORES"]))
+      ["one", "1", "uno", "1", "two", "2", "three", "3"]
+  """
+  def zadd(key, [h|_] = opts) when is_tuple(h), do: zadd(key, opts |> Enum.flat_map(&Tuple.to_list(&1)))
+  def zadd(key, opts) when is_list(opts), do: ["ZADD", key] ++ opts
+  def zadd(key, score, member), do: zadd(key, [score, member])
+
+  @doc ~S"""
+  Returns the number of elements of the sorted set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}]))
+      "2"
+      iex> execute(pid, zcard("myset"))
+      "2"
+  """
+  def zcard(key), do: ["ZCARD", key]
+
+  @doc ~S"""
+  Returns the number of elements in the sorted set at `key` with a score between
+  `min` and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zcount("myset", "-inf", "+inf"))
+      "3"
+      iex> execute(pid, zcount("myset", "(1", "3"))
+      "2"
+  """
+  def zcount(key, min, max), do: ["ZCOUNT", key, min, max]
+
+  @doc ~S"""
+  Increments the score of `member` in the sorted set stored at `key` by `increment`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}]))
+      "2"
+      iex> execute(pid, zincrby("myset", 2, "one"))
+      "3"
+      iex> execute(pid, zrange("myset", "0", "-1", ["WITHSCORES"]))
+      ["two", "2", "one", "3"]
+  """
+  def zincrby(key, increment, member), do: ["ZINCRBY", key, increment, member]
+
+  @doc ~S"""
+  Computes the intersection of the sorted sets given by the specified `keys`,
+  and stores the result in `dest`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("set1", [{1, "one"}, {2, "two"}]))
+      "2"
+      iex> execute(pid, zadd("set2", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zinterstore("out", ["set1", "set2"], ["WEIGHTS", 2, 3]))
+      "2"
+      iex> execute(pid, zrange("out", "0", "-1", ["WITHSCORES"]))
+      ["one", "5", "two", "10"]
+  """
+  def zinterstore(dest, keys, opts), do: ["ZINTERSTORE", dest, Enum.count(keys)] ++ keys ++ opts
+
+  @doc ~S"""
+  Returns the number of elements in the sorted set at `key` with a value between
+  `min` and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{0, "a"}, {0, "b"}, {0, "c"}, {0, "d"}]))
+      "4"
+      iex> execute(pid, zlexcount("myset", "-", "+"))
+      "4"
+      iex> execute(pid, zlexcount("myset", "[b", "[c"))
+      "2"
+  """
+  def zlexcount(key, min, max), do: ["ZLEXCOUNT", key, min, max]
+
+  @doc ~S"""
+  Returns the specified range of elements in the sorted set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrange("myset", 0, -1))
+      ["one", "two", "three"]
+      iex> execute(pid, zrange("myset", 2, 3))
+      ["three"]
+      iex> execute(pid, zrange("myset", -2, -1))
+      ["two", "three"]
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrange("myset", 0, 1, ["WITHSCORES"]))
+      ["one", "1", "two", "2"]
+  """
+  def zrange(key, from, to, opts \\ []), do: ["ZRANGE", key, from, to] ++ opts
+
+  @doc ~S"""
+  Returns all the elements in the sorted set at `key` with a value between `min`
+  and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{0, "a"}, {0, "b"}, {0, "c"}, {0, "d"}]))
+      "4"
+      iex> execute(pid, zrangebylex("myset", "-", "[c"))
+      ["a", "b", "c"]
+      iex> execute(pid, zrangebylex("myset", "-", "(c"))
+      ["a", "b"]
+      iex> execute(pid, zrangebylex("myset", "[aaa", "(d"))
+      ["b", "c"]
+  """
+  def zrangebylex(key, min, max, opts \\ []), do: ["ZRANGEBYLEX", key, min, max] ++ opts
+
+  @doc ~S"""
+  Returns all the elements in the sorted set at `key` with a score between `min`
+  and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrangebyscore("myset", "-inf", "+inf"))
+      ["one", "two", "three"]
+      iex> execute(pid, zrangebyscore("myset", 1, 2))
+      ["one", "two"]
+      iex> execute(pid, zrangebyscore("myset", "(1", 2, ["WITHSCORES"]))
+      ["two", "2"]
+      iex> execute(pid, zrangebyscore("myset", "(1", "(2"))
+      []
+  """
+  def zrangebyscore(key, min, max, opts \\ []), do: ["ZRANGEBYSCORE", key, to_string(min), to_string(max)] ++ opts
+
+  @doc ~S"""
+  Returns the rank of `member` in the sorted set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrank("myset", "three"))
+      "2"
+      iex> execute(pid, zrank("myset", "four"))
+      :undefined
+  """
+  def zrank(key, member), do: ["ZRANK", key, member]
+
+  @doc ~S"""
+  Removes the specified `members` from the sorted set stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrem("myset", "two"))
+      "1"
+      iex> execute(pid, zrange("myset", 0, -1, ["WITHSCORES"]))
+      ["one", "1", "three", "3"]
+  """
+  def zrem(key, members) when is_list(members), do: ["ZREM", key] ++ members
+  def zrem(key, member), do: zrem(key, [member])
+
+  @doc ~S"""
+  Removes all elements in the sorted set stored at `key` between the
+  lexicographical range specified by `min` and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{0, "ALPHA"}, {0, "alpha"}, {0, "a"}, {0, "b"}, {0, "y"}, {0, "z"}]))
+      "6"
+      iex> execute(pid, zremrangebylex("myset", "[alpha", "[omega"))
+      "2"
+      iex> execute(pid, zrange("myset", 0, -1))
+      ["ALPHA", "a", "y", "z"]
+  """
+  def zremrangebylex(key, min, max), do: ["ZREMRANGEBYLEX", key, min, max]
+
+  @doc ~S"""
+  Removes all elements in the sorted set stored at key with rank between `from`
+  and `to`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zremrangebyrank("myset", 0, 1))
+      "2"
+      iex> execute(pid, zrange("myset", 0, -1, ["WITHSCORES"]))
+      ["three", "3"]
+  """
+  def zremrangebyrank(key, from, to), do: ["ZREMRANGEBYRANK", key, from, to]
+
+  @doc ~S"""
+  Removes all elements in the sorted set stored at `key` with a score between
+  `min` and `max`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zremrangebyscore("myset", "-inf", "(2"))
+      "1"
+      iex> execute(pid, zrange("myset", 0, -1, ["WITHSCORES"]))
+      ["two", "2", "three", "3"]
+  """
+  def zremrangebyscore(key, min, max), do: ["ZREMRANGEBYSCORE", key, min, max]
+
+  @doc ~S"""
+  Returns the specified range of elements in the sorted set stored at `key`
+  ordered from highest to lowest score.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrevrange("myset", 0, -1))
+      ["three", "two", "one"]
+      iex> execute(pid, zrevrange("myset", 2, 3))
+      ["one"]
+      iex> execute(pid, zrevrange("myset", -2, -1))
+      ["two", "one"]
+  """
+  def zrevrange(key, min, max, opts \\ []), do: ["ZREVRANGE", key, min, max] ++ opts
+
+  @doc ~S"""
+  Returns all the elements in the sorted set at `key` with a value between `max`
+  and `min` ordered from highest to lowest score.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{0, "a"}, {0, "b"}, {0, "c"}, {0, "d"}]))
+      "4"
+      iex> execute(pid, zrevrangebylex("myset", "[c", "-"))
+      ["c", "b", "a"]
+      iex> execute(pid, zrevrangebylex("myset", "(c", "-"))
+      ["b", "a"]
+      iex> execute(pid, zrevrangebylex("myset", "(d", "[aaa"))
+      ["c", "b"]
+  """
+  def zrevrangebylex(key, max, min, opts \\ []), do: ["ZREVRANGEBYLEX", key, max, min] ++ opts
+
+  @doc ~S"""
+  Returns all the elements in the sorted set at `key` with a score between `max`
+  and `min` ordered from highest to lowest score.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrevrangebyscore("myset", "+inf", "-inf"))
+      ["three", "two", "one"]
+      iex> execute(pid, zrevrangebyscore("myset", 2, 1))
+      ["two", "one"]
+      iex> execute(pid, zrevrangebyscore("myset", 2, "(1"))
+      ["two"]
+      iex> execute(pid, zrevrangebyscore("myset", "(2", "(1"))
+      []
+  """
+  def zrevrangebyscore(key, max, min, opts \\ []), do: ["ZREVRANGEBYSCORE", key, max, min] ++ opts
+
+  @doc ~S"""
+  Returns the rank of `member` in the sorted set stored at `key`, with the
+  scores ordered from high to low.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zrevrank("myset", "one"))
+      "2"
+      iex> execute(pid, zrevrank("myset", "four"))
+      :undefined
+  """
+  def zrevrank(key, member), do: ["ZREVRANK", key, member]
+
+  @doc ~S"""
+  Incrementally iterate over a collection of elements in a sorted set.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zscan("myset", 0))
+      ["0", ["one", "1", "two", "2", "three", "3"]]
+      iex> execute(pid, zscan("myset", 0, ["MATCH", "*o*"]))
+      ["0", ["one", "1", "two", "2"]]
+  """
+  def zscan(key, cursor, opts \\ []), do: ["ZSCAN", key, cursor] ++ opts
+
+  @doc ~S"""
+  Returns the score of `member` in the sorted set at `key`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("myset", 1, "one"))
+      "1"
+      iex> execute(pid, zscore("myset", "one"))
+      "1"
+  """
+  def zscore(key, member), do: ["ZSCORE", key, member]
+
+  @doc ~S"""
+  Computes the union of the sorted sets given by the specified `keys`, and
+  stores the result in `dest`.
+
+  ## Examples
+
+      iex> execute(pid, zadd("set1", [{1, "one"}, {2, "two"}]))
+      "2"
+      iex> execute(pid, zadd("set2", [{1, "one"}, {2, "two"}, {3, "three"}]))
+      "3"
+      iex> execute(pid, zunionstore("out", ["set1", "set2"], ["WEIGHTS", 2, 3]))
+      "3"
+      iex> execute(pid, zrange("out", "0", "-1", ["WITHSCORES"]))
+      ["one", "5", "three", "9", "two", "10"]
+  """
+  def zunionstore(dest, keys, opts), do: ["ZUNIONSTORE", dest, Enum.count(keys)] ++ keys ++ opts
+
+
   ### HASH OPERATIONS
 
 
