@@ -1613,6 +1613,204 @@ defmodule Redis do
   ### HASH OPERATIONS
 
 
+  @doc ~S"""
+  Removes the specified `fields` from the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field1", "foo"))
+      "1"
+      iex> execute(pid, hdel("myhash", ["field1"]))
+      "1"
+      iex> execute(pid, hdel("myhash", "field2"))
+      "0"
+  """
+  def hdel(key, fields) when is_list(fields), do: ["HDEL", key] ++ fields
+  def hdel(key, field), do: hdel(key, [field])
+
+  @doc ~S"""
+  Returns if `field` is an existing field in the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field1", "foo"))
+      "1"
+      iex> execute(pid, hexists("myhash", "field1"))
+      "1"
+      iex> execute(pid, hexists("myhash", "field2"))
+      "0"
+  """
+  def hexists(key, field), do: ["HEXISTS", key, field]
+
+  @doc ~S"""
+  Returns the value associated with `field` in the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field1", "foo"))
+      "1"
+      iex> execute(pid, hget("myhash", "field1"))
+      "foo"
+      iex> execute(pid, hget("myhash", "field2"))
+      :undefined
+  """
+  def hget(key, field), do: ["HGET", key, field]
+
+  @doc ~S"""
+  Returns all fields and values of the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hgetall("myhash"))
+      ["field1", "Hello", "field2", "World"]
+  """
+  def hgetall(key), do: ["HGETALL", key]
+
+  @doc ~S"""
+  Increments the number stored at `field` in the hash stored at `key` by
+  `increment`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field", 5))
+      "1"
+      iex> execute(pid, hincrby("myhash", "field", 1))
+      "6"
+      iex> execute(pid, hincrby("myhash", "field", -1))
+      "5"
+      iex> execute(pid, hincrby("myhash", "field", -10))
+      "-5"
+  """
+  def hincrby(key, field, increment), do: ["HINCRBY", key, field, increment]
+
+  @doc ~S"""
+  Increment the specified `field` of an hash stored at `key`, and representing a
+  floating point number, by the specified `increment`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field", 10.50))
+      "1"
+      iex> execute(pid, hincrbyfloat("myhash", "field", 0.1))
+      "10.6"
+
+      iex> execute(pid, hset("myhash", "field", 5.0e3))
+      "1"
+      iex> execute(pid, hincrbyfloat("myhash", "field", 2.0e2))
+      "5200"
+  """
+  def hincrbyfloat(key, field, increment), do: ["HINCRBYFLOAT", key, field, to_string(increment)]
+
+  @doc ~S"""
+  Returns all field names in the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hkeys("myhash"))
+      ["field1", "field2"]
+  """
+  def hkeys(key), do: ["HKEYS", key]
+
+  @doc ~S"""
+  Returns the number of fields contained in the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hlen("myhash"))
+      "2"
+  """
+  def hlen(key), do: ["HLEN", key]
+
+  @doc ~S"""
+  Returns the values associated with the specified `fields` in the hash stored
+  at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hmget("myhash", "field1"))
+      ["Hello"]
+      iex> execute(pid, hmget("myhash", ["field2", "nofield"]))
+      ["World", :undefined]
+  """
+  def hmget(key, fields) when is_list(fields), do: ["HMGET", key] ++ fields
+  def hmget(key, field), do: hmget(key, [field])
+
+  @doc ~S"""
+  Returns the values associated with the specified `fields` in the hash stored
+  at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hmget("myhash", ["field1", "field2"]))
+      ["Hello", "World"]
+
+      iex> execute(pid, hmset("myhash", "field", "Hello World"))
+      "OK"
+      iex> execute(pid, hget("myhash", "field"))
+      "Hello World"
+  """
+  def hmset(key, field_values) when is_list(field_values), do: ["HMSET", key] ++ field_values
+  def hmset(key, field, value), do: hmset(key, [field, value])
+
+  @doc ~S"""
+  Iterates fields of Hash types and their associated values.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hscan("myhash", 0))
+      ["0", ["field1", "Hello", "field2", "World"]]
+  """
+  def hscan(key, cursor, opts \\ []), do: ["HSCAN", key, cursor] ++ opts
+
+  @doc ~S"""
+  Sets `field` in the hash stored at `key` to `value`.
+
+  ## Examples
+
+      iex> execute(pid, hset("myhash", "field", "Hello"))
+      "1"
+      iex> execute(pid, hget("myhash", "field"))
+      "Hello"
+  """
+  def hset(key, field, value), do: ["HSET", key, field, to_string(value)]
+
+  @doc ~S"""
+  Sets `field` in the hash stored at `key` to `value`, only if `field` does not yet exist.
+
+  ## Examples
+
+      iex> execute(pid, hsetnx("myhash", "field", "Hello"))
+      "1"
+      iex> execute(pid, hsetnx("myhash", "field", "World"))
+      "0"
+      iex> execute(pid, hget("myhash", "field"))
+      "Hello"
+  """
+  def hsetnx(key, field, value), do: ["HSETNX", key, field, to_string(value)]
+
+  @doc ~S"""
+  Returns all values in the hash stored at `key`.
+
+  ## Examples
+
+      iex> execute(pid, hmset("myhash", ["field1", "Hello", "field2", "World"]))
+      "OK"
+      iex> execute(pid, hvals("myhash"))
+      ["Hello", "World"]
+  """
+  def hvals(key), do: ["HVALS", key]
 
 
   defp query(pid, command) do
